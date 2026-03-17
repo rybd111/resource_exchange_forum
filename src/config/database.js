@@ -1,14 +1,28 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// 环境变量优先级：Render自动注入 > 手动配置 > 默认值
+// 解析 DATABASE_URL（Render提供的格式：postgres://user:pass@host:port/db）
+let dbConfig = {};
+if (process.env.DATABASE_URL) {
+  const url = require('url');
+  const parsed = url.parse(process.env.DATABASE_URL);
+  dbConfig = {
+    database: parsed.pathname.slice(1), // 去掉开头的 /
+    username: parsed.auth.split(':')[0],
+    password: parsed.auth.split(':')[1],
+    host: parsed.hostname,
+    port: parsed.port || 5432
+  };
+}
+
+// 环境变量优先级：DATABASE_URL > 单独变量 > 默认值
 const sequelize = new Sequelize(
-  process.env.PGDATABASE || process.env.DB_NAME || 'resource_platform',
-  process.env.PGUSER || process.env.DB_USER || 'postgres',
-  process.env.PGPASSWORD || process.env.DB_PASSWORD || '',
+  dbConfig.database || process.env.PGDATABASE || process.env.DB_NAME || 'resource_platform',
+  dbConfig.username || process.env.PGUSER || process.env.DB_USER || 'postgres',
+  dbConfig.password || process.env.PGPASSWORD || process.env.DB_PASSWORD || '',
   {
-    host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
-    port: process.env.PGPORT || process.env.DB_PORT || 5432,
+    host: dbConfig.host || process.env.PGHOST || process.env.DB_HOST || 'localhost',
+    port: dbConfig.port || process.env.PGPORT || process.env.DB_PORT || 5432,
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
