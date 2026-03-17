@@ -3,6 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+// 引入模型和数据库
+const sequelize = require('./config/database');
+const User = require('./models/User');
+const Resource = require('./models/Resource');
+const Cooperation = require('./models/Cooperation');
+
 // 引入路由
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
@@ -50,10 +56,36 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: '路由不存在' });
 });
 
+// 同步数据库表（生产环境使用 migrate）
+const syncDatabase = async () => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      // 生产环境：只创建不存在的表，不删除
+      await sequelize.sync();
+      console.log('✅ 数据库表同步完成');
+    } else {
+      // 开发环境：创建表
+      await sequelize.sync({ alter: true });
+      console.log('✅ 数据库表同步完成（开发模式）');
+    }
+  } catch (error) {
+    console.error('❌ 数据库表同步失败:', error);
+  }
+};
+
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
-});
+// 启动服务器
+const startServer = async () => {
+  // 先同步数据库表
+  await syncDatabase();
+  
+  // 再启动服务器
+  app.listen(PORT, () => {
+    console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
+  });
+};
+
+startServer();
 
 module.exports = app;
