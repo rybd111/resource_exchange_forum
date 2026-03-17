@@ -27,11 +27,13 @@ const storage = multer.diskStorage({
 
 // 文件过滤器
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedTypes.includes(file.mimetype)) {
+  const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg'];
+  
+  if (allowedImageTypes.includes(file.mimetype) || allowedVideoTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('只支持 JPG、PNG、GIF、WEBP 格式的图片'), false);
+    cb(new Error('只支持 JPG、PNG、GIF、WEBP 格式的图片和 MP4、WEBM、OGG 格式的视频'), false);
   }
 };
 
@@ -39,8 +41,8 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB 限制
-    files: 5 // 最多5张图片
+    fileSize: 50 * 1024 * 1024, // 50MB 限制（支持视频）
+    files: 10 // 最多10个文件
   }
 });
 

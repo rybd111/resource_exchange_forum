@@ -10,6 +10,8 @@ const Resource = require('./models/Resource');
 const Cooperation = require('./models/Cooperation');
 const Comment = require('./models/Comment');
 const Violation = require('./models/Violation');
+const DepositOrder = require('./models/DepositOrder');
+const WithdrawalOrder = require('./models/WithdrawalOrder');
 
 // 引入路由
 const authRoutes = require('./routes/auth');
@@ -19,6 +21,7 @@ const cooperationRoutes = require('./routes/cooperation');
 const messageRoutes = require('./routes/message');
 const adminRoutes = require('./routes/admin');
 const commentRoutes = require('./routes/comment');
+const financeRoutes = require('./routes/finance');
 
 // 建立模型关联
 User.hasMany(Resource, { foreignKey: 'userId', as: 'resources' });
@@ -35,6 +38,14 @@ Comment.belongsTo(Comment, { foreignKey: 'parentId', as: 'parent' });
 
 User.hasMany(Violation, { foreignKey: 'userId', as: 'violations' });
 Violation.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(DepositOrder, { foreignKey: 'userId', as: 'depositOrders' });
+DepositOrder.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(WithdrawalOrder, { foreignKey: 'userId', as: 'withdrawalOrders' });
+WithdrawalOrder.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+WithdrawalOrder.belongsTo(Cooperation, { foreignKey: 'cooperationId', as: 'cooperation' });
 
 const app = express();
 
@@ -55,10 +66,30 @@ app.use('/api/cooperation', cooperationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/finance', financeRoutes);
 
-// 首页 - 使用论坛界面
+// 首页 - 未登录显示引流页，登录后显示论坛
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/forum.html'));
+  const authHeader = req.headers.authorization;
+  const hasToken = authHeader && authHeader.startsWith('Bearer ');
+  
+  if (hasToken) {
+    // 已登录，显示论坛
+    res.sendFile(path.join(__dirname, '../public/forum.html'));
+  } else {
+    // 未登录，显示引流页
+    res.sendFile(path.join(__dirname, '../public/landing.html'));
+  }
+});
+
+// 登录页
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/landing.html'));
+});
+
+// 注册页
+app.get('/register.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/landing.html'));
 });
 
 // 错误处理中间件
