@@ -1,21 +1,29 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// 根据环境变量选择数据库
-const sequelize = new Sequelize({
-  dialect: process.env.DB_DIALECT || 'postgres',
-  host: process.env.DB_HOST || process.env.PGDATABASE ? 'localhost' : undefined,
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || process.env.PGDATABASE,
-  username: process.env.DB_USER || process.env.PGUSER,
-  password: process.env.DB_PASSWORD || process.env.PGPASSWORD,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
-  define: {
-    timestamps: true,
-    underscored: true
+// 环境变量优先级：Render自动注入 > 手动配置 > 默认值
+const sequelize = new Sequelize(
+  process.env.PGDATABASE || process.env.DB_NAME || 'resource_platform',
+  process.env.PGUSER || process.env.DB_USER || 'postgres',
+  process.env.PGPASSWORD || process.env.DB_PASSWORD || '',
+  {
+    host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
+    port: process.env.PGPORT || process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    },
+    define: {
+      timestamps: true,
+      underscored: true
+    }
   }
-});
+);
 
 // 测试连接
 sequelize.authenticate()
