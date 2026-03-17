@@ -1,9 +1,6 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
-
 // 根据环境变量选择数据库
 const sequelize = new Sequelize({
   dialect: process.env.DB_DIALECT || 'postgres',
