@@ -1,8 +1,67 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const Resource = require('../models/Resource');
 const User = require('../models/User');
+const Violation = require('../models/Violation');
+const { autoModerate, shouldBanUser } = require('../utils/contentFilter');
+const jwt = require('jsonwebtoken');
+
+// 配置 multer 存储
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/resources');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'resource-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// 文件过滤器
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只支持 JPG、PNG、GIF、WEBP 格式的图片'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB 限制
+    files: 5 // 最多5张图片
+  }
+});
+
+// 中间件：验证Token
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: '请先登录' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Token已失效' });
+  }
+}
 
 // 获取资源列表
 router.get('/', async (req, res) => {
@@ -91,8 +150,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 发布资源（需登录）
-router.post('/', requireAuth, async (req, res) => {
+// 发布资源（需登录，支持图片上传）
+router.post('/', requireAuth, upload.array('images', 5), async (req, res) => {
   try {
     const {
       title,
@@ -108,6 +167,58 @@ router.post('/', requireAuth, async (req, res) => {
       serviceScope
     } = req.body;
     
+    // 内容审核
+    const moderation = autoModerate(title + ' ' + description);
+    
+    if (moderation.action === 'reject') {
+      // 删除已上传的图片
+      if (req.files) {
+        req.files.forEach(file => {
+          fs.unlinkSync(file.path);
+        });
+      }
+      
+      // 记录违规
+      await Violation.create({
+        userId: req.user.id,
+        type: moderation.violations[0]?.type || 'other',
+        level: moderation.violationLevel,
+        content: title + ' ' + description,
+        action: 'delete',
+        description: moderation.reason
+      });
+      
+      // 检查是否需要封号
+      const userViolations = await Violation.findAll({
+        where: { userId: req.user.id }
+      });
+      
+      if (shouldBanUser(userViolations)) {
+        await User.update(
+          { status: 'banned' },
+          { where: { id: req.user.id } }
+        );
+        
+        return res.status(403).json({
+          success: false,
+          message: '您的账号因多次违规已被封禁'
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: '内容包含违规信息',
+        reason: moderation.reason
+      });
+    }
+    
+    // 处理上传的图片
+    const images = req.files ? req.files.map(file => ({
+      url: `/uploads/resources/${file.filename}`,
+      name: file.originalname,
+      size: file.size
+    })) : [];
+    
     const resource = await Resource.create({
       userId: req.user.id,
       title,
@@ -121,15 +232,25 @@ router.post('/', requireAuth, async (req, res) => {
       visibility,
       region,
       serviceScope,
-      status: 'draft' // 默认草稿状态
+      caseImages: images,
+      status: 'published' // 直接发布
     });
     
     res.status(201).json({
       success: true,
+      message: moderation.violationLevel === 'low' ? '发布成功（敏感词已过滤）' : '发布成功',
       data: resource
     });
   } catch (error) {
     console.error('发布资源错误:', error);
+    // 删除已上传的图片
+    if (req.files) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+    }
     res.status(500).json({ success: false, message: '发布资源失败' });
   }
 });
@@ -183,25 +304,5 @@ router.delete('/:id', requireAuth, async (req, res) => {
     res.status(500).json({ success: false, message: '删除资源失败' });
   }
 });
-
-// 中间件
-function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: '请先登录' });
-  }
-  
-  const jwt = require('jsonwebtoken');
-  const token = authHeader.split(' ')[1];
-  
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Token已失效' });
-  }
-}
 
 module.exports = router;

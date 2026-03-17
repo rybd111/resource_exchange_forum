@@ -8,6 +8,8 @@ const sequelize = require('./config/database');
 const User = require('./models/User');
 const Resource = require('./models/Resource');
 const Cooperation = require('./models/Cooperation');
+const Comment = require('./models/Comment');
+const Violation = require('./models/Violation');
 
 // 引入路由
 const authRoutes = require('./routes/auth');
@@ -16,6 +18,23 @@ const resourceRoutes = require('./routes/resource');
 const cooperationRoutes = require('./routes/cooperation');
 const messageRoutes = require('./routes/message');
 const adminRoutes = require('./routes/admin');
+const commentRoutes = require('./routes/comment');
+
+// 建立模型关联
+User.hasMany(Resource, { foreignKey: 'userId', as: 'resources' });
+Resource.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(Comment, { foreignKey: 'userId', as: 'comments' });
+Comment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Resource.hasMany(Comment, { foreignKey: 'resourceId', as: 'comments' });
+Comment.belongsTo(Resource, { foreignKey: 'resourceId', as: 'resource' });
+
+Comment.hasMany(Comment, { foreignKey: 'parentId', as: 'replies' });
+Comment.belongsTo(Comment, { foreignKey: 'parentId', as: 'parent' });
+
+User.hasMany(Violation, { foreignKey: 'userId', as: 'violations' });
+Violation.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 const app = express();
 
@@ -35,10 +54,11 @@ app.use('/api/resources', resourceRoutes);
 app.use('/api/cooperation', cooperationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/comments', commentRoutes);
 
-// 首页
+// 首页 - 使用论坛界面
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  res.sendFile(path.join(__dirname, '../public/forum.html'));
 });
 
 // 错误处理中间件

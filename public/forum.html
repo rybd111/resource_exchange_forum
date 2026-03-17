@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>资源集散地 - 能力交易平台</title>
+  <link rel="stylesheet" href="/css/forum.css">
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <a href="/">🏠 资源集散地</a>
+      </div>
+      <div class="nav-menu" id="navMenu">
+        <a href="/" class="nav-link active">首页</a>
+        <a href="#categories" class="nav-link">分类</a>
+        <a href="#publish" class="nav-link" id="publishLink" style="display:none;">发布资源</a>
+      </div>
+      <div class="nav-auth" id="navAuth">
+        <button class="btn btn-outline" onclick="showModal('login')">登录</button>
+        <button class="btn btn-primary" onclick="showModal('register')">注册</button>
+      </div>
+      <div class="nav-user" id="navUser" style="display: none;">
+        <span class="credit-badge" id="creditBadge"></span>
+        <span class="user-name" id="userName"></span>
+        <button class="btn btn-outline" onclick="logout()">退出</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 未登录：显示登录提示 -->
+  <div id="guestView" class="guest-view">
+    <div class="hero">
+      <h1>资源汇聚 · 能力变现</h1>
+      <p>连接资源供给方与需求方的撮合平台</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" onclick="showModal('register')">立即注册</button>
+        <button class="btn btn-outline btn-lg" onclick="showModal('login')">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 已登录：显示论坛界面 -->
+  <div id="forumView" class="forum-view" style="display:none;">
+    <div class="forum-container">
+      <!-- 左侧：分类导航 -->
+      <aside class="forum-sidebar">
+        <div class="sidebar-section">
+          <h3>资源分类</h3>
+          <ul class="category-list" id="categoryList">
+            <li class="category-item active" data-category="all">
+              <span class="category-icon">📋</span>
+              <span class="category-name">全部资源</span>
+            </li>
+            <li class="category-item" data-category="tech">
+              <span class="category-icon">💻</span>
+              <span class="category-name">技术服务</span>
+            </li>
+            <li class="category-item" data-category="manufacture">
+              <span class="category-icon">🏭</span>
+              <span class="category-name">制造加工</span>
+            </li>
+            <li class="category-item" data-category="service">
+              <span class="category-icon">🔧</span>
+              <span class="category-name">生活服务</span>
+            </li>
+            <li class="category-item" data-category="enterprise">
+              <span class="category-icon">🏢</span>
+              <span class="category-name">企业服务</span>
+            </li>
+            <li class="category-item" data-category="product">
+              <span class="category-icon">📦</span>
+              <span class="category-name">产品供应</span>
+            </li>
+            <li class="category-item" data-category="invest">
+              <span class="category-icon">💰</span>
+              <span class="category-name">投资合作</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="sidebar-section">
+          <button class="btn btn-primary btn-block" onclick="showPublishModal()">
+            + 发布资源
+          </button>
+        </div>
+      </aside>
+
+      <!-- 中间：资源列表 -->
+      <main class="forum-main">
+        <div class="forum-header">
+          <h2 id="currentCategory">全部资源</h2>
+          <div class="forum-filter">
+            <select id="sortFilter" onchange="loadResources()">
+              <option value="newest">最新发布</option>
+              <option value="hot">最多浏览</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="resource-list" id="resourceList">
+          <div class="loading">加载中...</div>
+        </div>
+        
+        <div class="pagination" id="pagination"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 资源详情弹窗 -->
+  <div id="resourceModal" class="modal">
+    <div class="modal-content modal-lg">
+      <span class="modal-close" onclick="closeModal('resource')">&times;</span>
+      <div id="resourceDetail"></div>
+    </div>
+  </div>
+
+  <!-- 发布资源弹窗 -->
+  <div id="publishModal" class="modal">
+    <div class="modal-content modal-lg">
+      <span class="modal-close" onclick="closeModal('publish')">&times;</span>
+      <h2>发布资源</h2>
+      <form id="publishForm" onsubmit="handlePublish(event)" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>资源标题 *</label>
+          <input type="text" name="title" required placeholder="请输入资源标题">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>分类 *</label>
+            <select name="category" required>
+              <option value="">请选择分类</option>
+              <option value="tech">技术服务</option>
+              <option value="manufacture">制造加工</option>
+              <option value="service">生活服务</option>
+              <option value="enterprise">企业服务</option>
+              <option value="product">产品供应</option>
+              <option value="invest">投资合作</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>子分类</label>
+            <input type="text" name="subCategory" placeholder="如：软件开发">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>资源描述 *</label>
+          <textarea name="description" rows="4" required placeholder="详细描述您的资源或服务..."></textarea>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>价格模式</label>
+            <select name="priceModel">
+              <option value="negotiable">面议</option>
+              <option value="quoted">报价</option>
+              <option value="range">价格区间</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>合作类型</label>
+            <select name="cooperationType">
+              <option value="one-time">一次性</option>
+              <option value="long-term">长期合作</option>
+              <option value="equity">股权合作</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>上传图片（最多5张）</label>
+          <input type="file" name="images" multiple accept="image/*" onchange="previewImages(event)">
+          <div class="image-preview" id="imagePreview"></div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">发布</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 登录弹窗 -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeModal('login')">&times;</span>
+      <h2>登录</h2>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>手机号</label>
+          <input type="tel" name="phone" required placeholder="请输入手机号">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" name="password" required placeholder="请输入密码">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">登录</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 注册弹窗 -->
+  <div id="registerModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeModal('register')">&times;</span>
+      <h2>注册</h2>
+      <form id="registerForm" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" name="username" required placeholder="3-20个字符">
+        </div>
+        <div class="form-group">
+          <label>真实姓名</label>
+          <input type="text" name="realName" required placeholder="请输入真实姓名">
+        </div>
+        <div class="form-group">
+          <label>手机号</label>
+          <input type="tel" name="phone" required placeholder="请输入手机号">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" name="password" required placeholder="至少6位">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">注册</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/forum.js"></script>
+</body>
+</html>
